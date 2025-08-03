@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 40px auto;
+      display: flex;
+      justify-content: center;
+      color: #202124;
+      min-height: 100vh;
+    }
+
+    .container {
+      background: #fff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      padding: 20px 30px;
+      max-width: 80vw;
+      min-width: 700px;
+      width: 80vw;
+      box-sizing: border-box;
+      user-select: none;
+      position: relative;
+    }
+
+    h1 {
+      text-align: center;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 24px;
+    }
+
+    .action-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin: 12px 0 20px;
+    }
+
+    .action-bar button {
+      background: #1a73e8;
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .action-bar button:disabled {
+      background-color: #cccccc;
+      cursor: default;
+    }
+
+    .action-bar button:hover:not(:disabled) {
+      background: #155ab6;
+    }
+
+    ul.tree {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.3em;
+    }
+
+    ul.tree ul {
+      padding-left: 16px;
+      margin: 4px 0 0 0;
+      border-left: 1px solid #ccc;
+    }
+
+    li {
+      margin: 2px 0;
+      cursor: default;
+      user-select: none;
+      position: relative;
+      padding-left: 20px;
+      border-radius: 3px;
+    }
+
+    li.selected {
+      background-color: #d2e3fc;
+    }
+
+    li.drag-over {
+      outline: 2px dashed #1a73e8;
+      outline-offset: -2px;
+    }
+
+    .caret {
+      cursor: pointer;
+      user-select: none;
+      display: inline-block;
+      width: 14px;
+      font-weight: 700;
+      color: #555;
+      transition: transform 0.15s ease;
+      margin-right: 4px;
+    }
+
+    .caret.open {
+      transform: rotate(90deg);
+      color: #1a73e8;
+    }
+
+    .folder-name, .file-name {
+      font-weight: 600;
+      color: #1a73e8;
+      cursor: pointer;
+      user-select: text;
+      display: inline-block;
+      max-width: 70vw;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-name {
+      font-weight: normal;
+      color: #333;
+      margin-left: 22px;
+      display: block;
+    }
+
+    a.open-link {
+      font-size: 12px;
+      color: #5f6368;
+      margin-left: 6px;
+      text-decoration: none;
+    }
+
+    a.open-link:hover {
+      text-decoration: underline;
+      color: #1a73e8;
+    }
+
+    #contextMenu {
+      position: absolute;
+      background: white;
+      border: 1px solid #ccc;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+      z-index: 1000;
+      display: none;
+      min-width: 120px;
+      border-radius: 4px;
+      user-select: none;
+    }
+
+    #contextMenu ul {
+      list-style: none;
+      padding: 8px 0;
+      margin: 0;
+    }
+
+    #contextMenu ul li {
+      padding: 8px 16px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #contextMenu ul li:hover {
+      background-color: #f0f0f0;
+    }
+
+    .rename-input {
+      font-size: 14px;
+      padding: 2px 4px;
+      width: 300px;
+      box-sizing: border-box;
+    }
+
+    #loading {
+      text-align: center;
+      margin-top: 20px;
+      font-style: italic;
+      color: #666;
+    }
+
+    /* Folder Picker Modal */
+    #folderPickerModal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #folderPickerModal .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      max-height: 80vh;
+      overflow: auto;
+      min-width: 300px;
+    }
+
+    #folderPickerModal .modal-content h3 {
+      margin-top: 0;
+    }
+
+    #folderPickerList li {
+      cursor: pointer;
+    }
+
+    #folderPickerList li.selected {
+      background-color: #d2e3fc;
+    }
+
+    #folderPickerList ul {
+      padding-left: 16px;
+      margin-left: 4px;
+      border-left: 1px solid #ccc;
+    }
+    ul.tree ul li.file-name {
+  padding-left: 20px;  /* Match folder li padding-left */
+  margin-left: 0;      /* Remove any extra margin */
+}
+
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 id="headingTitle">Drive Organizer</h1>
+
+    <div class="action-bar">
+      <button id="newFolderBtn" disabled>New Folder</button>
+      <button id="renameBtn" disabled>Rename</button>
+      <button id="deleteBtn" disabled>Delete</button>
+      <button id="selectAllBtn" disabled>Select All in Folder</button>
+      <button id="clearSelectionBtn" disabled>Clear Selection</button>
+      <button id="refreshBtn">Refresh</button>
+      <button id="expandAllBtn">Expand All</button>
+      <button id="collapseAllBtn">Collapse All</button>
+    </div>
+
+    <div id="loading">Loading Drive data...</div>
+    <div id="treeContainer" style="display:none;"></div>
+  </div>
+
+  <!-- Folder Picker Modal -->
+  <div id="folderPickerModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:2000; justify-content:center; align-items:center;">
+  <div class="modal-content" style="background:white; padding:20px; border-radius:8px; max-height:80vh; overflow:auto; min-width:300px;">
+    <h3>Select Destination Folder</h3>
+    <ul id="folderPickerList" class="tree"></ul>
+    <div style="margin-top:12px; text-align:right;">
+      <button id="confirmMoveBtn" disabled>Confirm Move Here</button>
+      <button id="cancelFolderPicker">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
+  </div>
+
+  <div id="contextMenu">
+    <ul>
+      <li id="renameOption">Rename</li>
+    </ul>
+  </div>
+
+  <script>
+  let currentContextItem = null;
+  let renameInProgress = false;
+  let selectedItems = new Set();
+  let openFolders = new Set();
+  let isProUser = false;
+
+  window.onload = () => {
+  // Initialize buttons and event handlers
+  document.getElementById('newFolderBtn').addEventListener('click', () => onAddFolderClick());
+  document.getElementById('renameBtn').addEventListener('click', () => onRenameClick());
+  document.getElementById('deleteBtn').addEventListener('click', () => onDeleteClick());
+  document.getElementById('selectAllBtn').addEventListener('click', () => onSelectAllInFolderClick());
+  document.getElementById('clearSelectionBtn').addEventListener('click', () => clearSelection());
+  document.getElementById('refreshBtn').addEventListener('click', () => loadTree());
+  document.getElementById('expandAllBtn').addEventListener('click', () => toggleAll(true));
+  document.getElementById('collapseAllBtn').addEventListener('click', () => toggleAll(false));
+
+  loadTree();
+
+  // Ask server if user is Pro
+  google.script.run.withSuccessHandler(proStatus => {
+    isProUser = proStatus;
+    updateActionButtons();
+
+    // Update <h1> heading title dynamically
+    const heading = document.getElementById('headingTitle');
+    if (heading) {
+      heading.textContent = isProUser ? 'Drive Organizer PRO' : 'Drive Organizer';
+    }
+
+    // Optionally also update <title>
+    document.title = isProUser ? 'Drive Organizer PRO' : 'Drive Organizer';
+  }).checkProStatus();
+};
+
+
+  function updateActionButtons() {
+    const hasSelection = selectedItems.size > 0;
+    const folders = Array.from(selectedItems).filter(i => i.dataset.type === 'folder');
+
+    if (!isProUser) {
+      // Disable all action buttons for non-pro users except viewing files
+      document.getElementById('newFolderBtn').disabled = true;
+      document.getElementById('renameBtn').disabled = true;
+      // If you have a moveBtn uncomment the next line
+      // document.getElementById('moveBtn').disabled = true;
+      document.getElementById('deleteBtn').disabled = true;
+      document.getElementById('selectAllBtn').disabled = true;
+      document.getElementById('clearSelectionBtn').disabled = true;
+
+      // Also optionally deselect any selected items that aren't view-only?
+      // Or just keep UI consistent and disable buttons
+    } else {
+      document.getElementById('newFolderBtn').disabled = folders.length !== 1;
+      document.getElementById('renameBtn').disabled = selectedItems.size !== 1;
+      // document.getElementById('moveBtn').disabled = !hasSelection;
+      document.getElementById('deleteBtn').disabled = !hasSelection;
+      document.getElementById('selectAllBtn').disabled = folders.length !== 1;
+      document.getElementById('clearSelectionBtn').disabled = !hasSelection;
+    }
+  }
+
+  // The rest of your script remains the same...
+
+  function loadTree() {
+    openFolders = new Set(JSON.parse(sessionStorage.getItem('openFolders') || '[]'));
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('treeContainer').style.display = 'none';
+    google.script.run.withSuccessHandler(renderTree).getCombinedRoots();
+  }
+
+  function renderTree(data) {
+    document.getElementById('loading').style.display = 'none';
+    const container = document.getElementById('treeContainer');
+    container.style.display = 'block';
+    container.innerHTML = '';
+
+    selectedItems.clear();
+    updateActionButtons();
+
+    const { myDrive, sharedDrives } = data;
+    const treeRoot = document.createElement('ul');
+    treeRoot.className = 'tree';
+
+    if (myDrive) treeRoot.appendChild(createFolderNode(myDrive));
+    if (sharedDrives) sharedDrives.forEach(sd => treeRoot.appendChild(createFolderNode(sd)));
+
+    container.appendChild(treeRoot);
+  }
+
+  function createFolderNode(folder) {
+    const li = document.createElement('li');
+    li.dataset.type = 'folder';
+    li.dataset.id = folder.id;
+    li.dataset.name = folder.name;
+    li.setAttribute('draggable', true);
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.addEventListener('click', e => {
+      e.stopPropagation();
+      checkbox.checked ? selectItem(li) : deselectItem(li);
+    });
+    li.appendChild(checkbox);
+
+    const caret = document.createElement('span');
+    caret.className = 'caret';
+    caret.textContent = '▶';
+
+    const folderName = document.createElement('span');
+    folderName.className = 'folder-name';
+    folderName.textContent = '📁 ' + folder.name;
+    folderName.title = folder.name;
+
+    const childrenUL = document.createElement('ul');
+    if (folder.folders) folder.folders.forEach(f => childrenUL.appendChild(createFolderNode(f)));
+    if (folder.files) folder.files.forEach(f => childrenUL.appendChild(createFileNode(f)));
+
+    const isOpen = openFolders.has(folder.id);
+    if (isOpen) {
+      caret.classList.add('open');
+      childrenUL.style.display = 'block';
+    } else {
+      childrenUL.style.display = 'none';
+    }
+
+    caret.addEventListener('click', () => toggleFolderOpen(caret, li));
+    folderName.addEventListener('click', () => {
+      toggleFolderOpen(caret, li);
+      checkbox.checked = true;
+      selectItem(li);
+    });
+
+    li.appendChild(caret);
+    li.appendChild(folderName);
+    li.appendChild(childrenUL);
+
+    // Drag & drop handlers
+    li.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', 'dragging');
+    });
+
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      li.classList.add('drag-over');
+    });
+
+    li.addEventListener('dragleave', () => {
+      li.classList.remove('drag-over');
+    });
+
+    li.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      li.classList.remove('drag-over');
+
+      // Block drop if user is NOT Pro
+      if (!isProUser) {
+        alert('Upgrade to Pro to move items.');
+        return;
+      }
+
+      const sourceIds = Array.from(selectedItems).map(i => i.dataset.id);
+      const destinationId = li.dataset.id;
+
+      if (!sourceIds.length || !destinationId) return;
+
+      if (!confirm(`Move ${sourceIds.length} item(s) to "${li.dataset.name}"?`)) return;
+
+      google.script.run.withSuccessHandler(res => {
+        if (res.success) loadTree();
+        else alert('Error: ' + res.error);
+      }).moveItems(sourceIds, destinationId);
+    });
+
+    return li;
+  }
+
+  function createFileNode(file) {
+    const li = document.createElement('li');
+    li.className = 'file-name';
+    li.dataset.type = 'file';
+    li.dataset.id = file.id;
+    li.dataset.name = file.name;
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.addEventListener('click', e => {
+      e.stopPropagation();
+      checkbox.checked ? selectItem(li) : deselectItem(li);
+    });
+    li.appendChild(checkbox);
+
+    const link = document.createElement('a');
+    link.href = file.url;
+    link.textContent = '📄 ' + file.name + (file.size ? ` (${formatSize(file.size)})` : '');
+    link.className = 'open-link';
+    link.target = '_blank';
+
+    li.appendChild(link);
+    return li;
+  }
+
+  function toggleFolderOpen(caret, li) {
+    const ul = li.querySelector('ul');
+    const id = li.dataset.id;
+    const isOpen = caret.classList.toggle('open');
+    ul.style.display = isOpen ? 'block' : 'none';
+
+    if (isOpen) openFolders.add(id);
+    else openFolders.delete(id);
+
+    sessionStorage.setItem('openFolders', JSON.stringify([...openFolders]));
+  }
+
+  function selectItem(item) {
+    if (!selectedItems.has(item)) {
+      selectedItems.add(item);
+      item.classList.add('selected');
+      const checkbox = item.querySelector('input[type="checkbox"]');
+      if (checkbox) checkbox.checked = true;
+      updateActionButtons();
+    }
+  }
+
+  function deselectItem(item) {
+    if (selectedItems.has(item)) {
+      selectedItems.delete(item);
+      item.classList.remove('selected');
+      const checkbox = item.querySelector('input[type="checkbox"]');
+      if (checkbox) checkbox.checked = false;
+      updateActionButtons();
+    }
+  }
+
+  function clearSelection() {
+    selectedItems.forEach(item => {
+      item.classList.remove('selected');
+      const checkbox = item.querySelector('input[type="checkbox"]');
+      if (checkbox) checkbox.checked = false;
+    });
+    selectedItems.clear();
+    updateActionButtons();
+  }
+
+  function formatSize(bytes) {
+    if (!bytes) return '';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function toggleAll(expand) {
+    document.querySelectorAll('.caret').forEach(caret => {
+      const li = caret.closest('li');
+      const ul = li.querySelector('ul');
+      if (ul) {
+        ul.style.display = expand ? 'block' : 'none';
+        caret.classList.toggle('open', expand);
+        const id = li.dataset.id;
+        if (expand) openFolders.add(id);
+        else openFolders.delete(id);
+      }
+    });
+    sessionStorage.setItem('openFolders', JSON.stringify([...openFolders]));
+  }
+
+  function onAddFolderClick() {
+    if (!isProUser) return alert('Upgrade to Pro to add folders.');
+
+    const selected = Array.from(selectedItems).find(i => i.dataset.type === 'folder');
+    if (!selected) return alert('Select a folder to add a subfolder.');
+
+    const name = prompt('New folder name:');
+    if (!name?.trim()) return;
+
+    google.script.run.withSuccessHandler(res => {
+      if (res.success) loadTree();
+      else alert('Error: ' + res.error);
+    }).createFolder(selected.dataset.id, name.trim());
+  }
+
+function onRenameClick() {
+  if (!isProUser) return alert('Upgrade to Pro to rename items.');
+  if (selectedItems.size !== 1) return alert('Select exactly one item to rename.');
+
+  const item = Array.from(selectedItems)[0];
+  
+  // Try to get id and type from item or its closest ancestor that has it
+  let id = item.dataset.id;
+  let type = item.dataset.type;
+
+  if (!id || !type) {
+    // try to find closest parent with these attributes
+    const closestWithId = item.closest('[data-id][data-type]');
+    if (closestWithId) {
+      id = closestWithId.dataset.id;
+      type = closestWithId.dataset.type;
+    }
+  }
+
+  console.log("Renaming item type:", type, "with ID:", id);
+
+  const label = item.querySelector('.folder-name, .file-name');
+  if (!label) return;
+
+  startRename(label, type, id);
+}
+
+
+function onDeleteClick() {
+  if (!isProUser) return alert('Upgrade to Pro to delete items.');
+  if (!selectedItems.size) return alert('No items selected.');
+  if (!confirm(`Delete ${selectedItems.size} item(s)?`)) return;
+
+  const ids = Array.from(selectedItems).map(i => i.dataset.id);
+  console.log("Deleting items:", ids);
+
+  google.script.run.withSuccessHandler(res => {
+    if (res.success) loadTree();
+    else alert('Error: ' + res.error);
+  }).deleteItems(ids);
+}
+
+  function onSelectAllInFolderClick() {
+    if (!isProUser) return alert('Upgrade to Pro to select all in folder.');
+    const folder = Array.from(selectedItems).find(i => i.dataset.type === 'folder');
+    if (!folder) return alert('Select a folder first.');
+    folder.querySelectorAll('li').forEach(selectItem);
+  }
+
+function startRename(label, type) {
+  if (renameInProgress) return;
+  renameInProgress = true;
+
+  const id = label.dataset.id || label.closest('li').dataset.id;
+  const oldName = label.dataset.name || label.closest('li').dataset.name;
+
+  if (type === 'folder') {
+    // Folder rename (same as before)
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = oldName;
+    input.className = 'rename-input';
+
+    label.style.display = 'none';
+
+    const folderLi = label.closest('li[data-type="folder"]');
+    if (folderLi) {
+      const sublist = folderLi.querySelector('ul');
+      if (sublist) sublist.style.display = 'none';
+    }
+
+    label.parentNode.insertBefore(input, label);
+
+    input.focus();
+    input.select();
+
+    const cancel = () => {
+      input.remove();
+      label.style.display = 'inline-block';
+      if (folderLi) {
+        const sublist = folderLi.querySelector('ul');
+        if (sublist) sublist.style.display = '';
+      }
+      renameInProgress = false;
+    };
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const newName = input.value.trim();
+        if (!newName) return cancel();
+
+        const callback = res => {
+          if (res.success) {
+            label.textContent = '📁 ' + newName;
+            label.dataset.name = newName;
+          } else {
+            alert('Error renaming: ' + res.error);
+          }
+          cancel();
+        };
+
+        google.script.run.withSuccessHandler(callback).renameFolder(id, newName);
+      } else if (e.key === 'Escape') {
+        cancel();
+      }
+    });
+
+    input.addEventListener('blur', cancel);
+
+  } else if (type === 'file') {
+    // File rename - replace <a> with <input>
+
+    const fileLi = label.closest('li[data-type="file"]');
+    if (!fileLi) {
+      console.error('File item not found for renaming');
+      renameInProgress = false;
+      return;
+    }
+    const fileLink = fileLi.querySelector('a.open-link');
+    if (!fileLink) {
+      console.error('File link element not found');
+      renameInProgress = false;
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = oldName;
+    input.className = 'rename-input';
+
+    fileLink.style.display = 'none';
+    fileLink.parentNode.insertBefore(input, fileLink);
+
+    input.focus();
+    input.select();
+
+    const cancel = () => {
+      input.remove();
+      fileLink.style.display = '';
+      renameInProgress = false;
+    };
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const newName = input.value.trim();
+        if (!newName) return cancel();
+
+        const callback = res => {
+          if (res.success) {
+            // Update link text with new file name + size text if any
+            const sizeTextMatch = fileLink.textContent.match(/\([^)]+\)$/);
+            fileLink.textContent = '📄 ' + newName + (sizeTextMatch ? ' ' + sizeTextMatch[0] : '');
+            label.dataset.name = newName;
+          } else {
+            alert('Error renaming: ' + res.error);
+          }
+          cancel();
+        };
+
+        google.script.run.withSuccessHandler(callback).renameFile(id, newName);
+      } else if (e.key === 'Escape') {
+        cancel();
+      }
+    });
+
+    input.addEventListener('blur', cancel);
+
+  } else {
+    console.error('Unknown type for rename:', type);
+    renameInProgress = false;
+  }
+}
+
+
+
+
+</script>
+</body>
+</html>
